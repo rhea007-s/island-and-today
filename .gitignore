@@ -1,0 +1,37 @@
+# macOS / editors
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Xcode — the project is generated from project.yml by XcodeGen
+TodayWidget.xcodeproj/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+
+# Secrets that must never be committed
+Shared/FirebaseKey.swift
+Android/local.properties
+*.jks
+*.keystore
+
+# Android / Gradle
+.gradle/
+Android/.gradle/
+Android/app/build/
+Android/build/
+*.apk
+*.aab
+
+# Release artefacts are attached to GitHub Releases, not committed
+*.dmg
+.kotlin/
+Android/.kotlin/
+
+# Early drafts from September, not part of any target (kept locally only)
+/AppGroup.swift
+/Models.swift
+/FocusSession.swift
+/FocusLiveActivity.swift

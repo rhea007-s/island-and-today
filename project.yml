@@ -1,0 +1,115 @@
+name: TodayWidget
+options:
+  bundleIdPrefix: com.karaman
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    # The Apple ID signed in to Xcode (personal team). The Mac Island target
+    # overrides this with local "-" signing.
+    DEVELOPMENT_TEAM: CLUKBD3TT5
+    TARGETED_DEVICE_FAMILY: "1"
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+targets:
+  Today:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.karaman.today
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Today
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        CODE_SIGN_ENTITLEMENTS: Entitlements/Today.entitlements
+        INFOPLIST_KEY_NSSupportsLiveActivities: YES
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: com.karaman.today
+            CFBundleURLSchemes: [today]
+        NSSupportsLiveActivities: true
+        NSCalendarsFullAccessUsageDescription: >-
+          Today keeps your scheduled tasks and your calendar in step,
+          so appointments show up in both places.
+    dependencies:
+      - target: TodayWidgetExtension
+        embed: true
+    # A shared scheme, so Xcode's run button and ./run.sh both find "Today".
+    scheme: {}
+
+  TodayWidgetExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widget
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.karaman.today.TodayWidget
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Today
+        SKIP_INSTALL: YES
+        CODE_SIGN_ENTITLEMENTS: Entitlements/TodayWidget.entitlements
+    info:
+      path: Widget/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        # The Up Next widget reads the calendar under the app's permission.
+        NSCalendarsFullAccessUsageDescription: >-
+          The Up Next widget shows today's events from your calendar.
+
+  # The Mac side: a Dynamic-Island-style panel that lives in the notch.
+  # Shares the task model with the iPhone app; leaves out FocusActivity.swift
+  # because ActivityKit (Live Activities) does not exist on macOS.
+  # Signed to run locally ("-"), so no Apple developer team is needed.
+  Island:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Island
+      - path: Shared/AppGroup.swift
+      - path: Shared/DayTask.swift
+      - path: Shared/TaskStore.swift
+      - path: Shared/HistoryExport.swift
+      - path: Shared/CloudSync.swift
+      - path: Shared/FirebaseConfig.swift
+      - path: Shared/FirebaseKey.swift
+      - path: Shared/SyncView.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.karaman.island
+        PRODUCT_NAME: Island
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_KEY_NSHumanReadableCopyright: "Island"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Island
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_NSAppleEventsUsageDescription: >-
+          Island shows what is playing in Music or Spotify and lets you
+          pause or skip from the notch.
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: >-
+          Island shows today's events and counts down to the next one in the notch.
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: ""
+        ENABLE_HARDENED_RUNTIME: NO
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        TARGETED_DEVICE_FAMILY: ""

@@ -1,0 +1,542 @@
+<title>Today Widget Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<style>
+  /* Deliberately single-theme: the stage is a dark studio so the two phone
+     screens read as lit objects. Every colour is painted explicitly, so the
+     page holds on either host background. */
+  :root {
+    --ink:        #0B0C10;
+    --panel:      #14161F;
+    --panel-2:    #1B1E2A;
+    --wire:       #262A38;
+    --text:       #E8E9EF;
+    --muted:      #7E839A;
+    --blue:       #0A84FF;
+    --green:      #30D158;
+    --vibrant:    rgba(255,255,255,.26);
+
+    --display: "Bricolage Grotesque", "Helvetica Neue", sans-serif;
+    --mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+    --device:  -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 0 0 56px;
+    background: var(--ink);
+    color: var(--text);
+    font: 15px/1.5 var(--device);
+    background-image:
+      radial-gradient(90% 55% at 50% -10%, rgba(74,63,122,.35) 0%, transparent 60%);
+  }
+
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+
+  /* ---------- page chrome ---------- */
+  .bar {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 18px;
+    padding: 30px 32px 26px; border-bottom: 1px solid var(--wire);
+  }
+  .brand {
+    font-family: var(--display); font-weight: 700; font-size: 25px;
+    letter-spacing: -.02em;
+  }
+  .brand span { color: var(--muted); font-weight: 500; }
+  .tagline { margin: 0; color: var(--muted); font-size: 14px; max-width: 62ch; }
+
+  .stage {
+    display: flex; flex-wrap: wrap; gap: 44px;
+    align-items: flex-start; justify-content: center; padding: 44px 24px 0;
+  }
+  .unit { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+  .cap {
+    margin: 0; font-family: var(--mono); font-size: 11px; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+  }
+
+  /* ---------- phone shell ---------- */
+  .phone {
+    position: relative; width: 390px; height: 800px; border-radius: 56px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 0 0 11px #1A1C24,
+                0 34px 80px rgba(0,0,0,.65);
+  }
+  .phone.lock {
+    background:
+      radial-gradient(120% 80% at 20% 0%,  #4A3F7A 0%, transparent 55%),
+      radial-gradient(110% 90% at 85% 25%, #1F5F6E 0%, transparent 50%),
+      linear-gradient(170deg, #241F38 0%, #0F1622 55%, #06080D 100%);
+  }
+  .phone.app { background: #000; display: flex; flex-direction: column; }
+  .notch {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    width: 112px; height: 32px; border-radius: 18px; background: #000; z-index: 5;
+  }
+  .statusbar {
+    position: relative; z-index: 6; display: flex; justify-content: space-between;
+    padding: 20px 30px 0; font-size: 14px; font-weight: 600; color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- lock screen ---------- */
+  .lockface { padding: 40px 22px 0; color: #fff; text-align: center; }
+  .datel { font-size: 21px; font-weight: 600; opacity: .95; }
+  .inline {
+    margin-top: 6px; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 17px; font-weight: 500; opacity: .9;
+  }
+  .clock {
+    margin-top: -4px; font-size: 86px; line-height: 1.05; font-weight: 600;
+    letter-spacing: -2px; font-variant-numeric: tabular-nums;
+  }
+
+  .row { display: flex; gap: 10px; margin-top: 12px; align-items: stretch; }
+  .w {
+    background: var(--vibrant);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    border-radius: 20px; color: #fff;
+  }
+  .w.circ { flex: 0 0 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; }
+  .w.rect {
+    flex: 1; height: 72px; padding: 9px 12px;
+    display: flex; flex-direction: column; text-align: left;
+  }
+  .rect-head {
+    display: flex; align-items: center; gap: 5px;
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase; opacity: .85;
+  }
+  .rect-body {
+    display: flex; align-items: flex-start; gap: 6px; margin-top: 4px;
+    font-size: 16px; font-weight: 600; cursor: pointer;
+    background: none; border: 0; color: inherit; font-family: inherit;
+    padding: 0; text-align: left; width: 100%;
+  }
+  .rect-body .title {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; line-height: 1.15;
+  }
+  .rect-body.done .title { text-decoration: line-through; opacity: .65; }
+  .rect-body .dot { flex: 0 0 auto; margin-top: 1px; }
+
+  .gauge { position: relative; width: 58px; height: 58px; }
+  .gauge svg { transform: rotate(-90deg); }
+  .gauge .track { stroke: rgba(255,255,255,.3); }
+  .gauge .fill  { stroke: #fff; stroke-linecap: round; transition: stroke-dashoffset .35s ease; }
+  .gauge .num {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) { .gauge .fill { transition: none; } }
+
+  /* Empty day: every slot becomes an "add a task" affordance. */
+  .linkish { cursor: pointer; }
+  .w.circ.linkish:hover, .w.rect .rect-body:hover { opacity: .85; }
+  .inline.linkish { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+
+  .composer.pulse input {
+    animation: pulse 900ms ease-out 2;
+    box-shadow: 0 0 0 0 rgba(10,132,255,.55);
+  }
+  @keyframes pulse {
+    from { box-shadow: 0 0 0 0 rgba(10,132,255,.55); }
+    to   { box-shadow: 0 0 0 9px rgba(10,132,255,0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .composer.pulse input { animation: none; box-shadow: 0 0 0 2px var(--blue); }
+  }
+
+  .hint {
+    position: absolute; bottom: 26px; left: 0; right: 0; text-align: center;
+    color: rgba(255,255,255,.45); font-family: var(--mono); font-size: 11px;
+  }
+
+  /* ---------- app screen ---------- */
+  .navbar { padding: 8px 20px 10px; }
+  .navbar .count {
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .navbar h1 { margin: 2px 0 0; font-size: 30px; font-weight: 700; letter-spacing: -.5px; color: #fff; }
+  .composer { display: flex; gap: 8px; padding: 0 16px 12px; }
+  .composer input {
+    flex: 1; background: #1C1C1E; border: none; border-radius: 12px;
+    padding: 13px 14px; color: #fff; font: 16px var(--device); outline: none;
+  }
+  .composer input::placeholder { color: #6E6E76; }
+  .composer button {
+    border: none; border-radius: 12px; padding: 0 17px; font-size: 20px;
+    background: var(--blue); color: #fff; cursor: pointer;
+  }
+  .composer button:disabled { background: #2C2C2E; color: #636366; cursor: default; }
+  .list { flex: 1; overflow-y: auto; padding: 0 16px 24px; }
+  .sect {
+    font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .12em;
+    text-transform: uppercase; color: #8E8E93; margin: 18px 4px 8px;
+  }
+  .item {
+    display: flex; align-items: center; gap: 12px; background: #1C1C1E;
+    border-radius: 12px; padding: 13px 14px; margin-bottom: 8px; cursor: pointer;
+    width: 100%; border: 0; color: #fff; font: 16px var(--device); text-align: left;
+  }
+  .item .box { flex: 0 0 auto; font-size: 19px; color: #8E8E93; }
+  .item.done .box { color: var(--green); }
+  .item.done .txt { text-decoration: line-through; color: #8E8E93; }
+  .item .txt { flex: 1; }
+  .item .del {
+    border: none; background: none; color: #48484A; font-size: 18px;
+    cursor: pointer; padding: 0 2px; line-height: 1;
+  }
+  .item .del:hover { color: #FF453A; }
+  .empty { color: #8E8E93; font-size: 15px; padding: 22px 4px; line-height: 1.55; }
+
+  .tools { display: flex; gap: 10px; }
+  .tools button {
+    background: var(--panel); color: var(--muted); border: 1px solid var(--wire);
+    border-radius: 9px; padding: 8px 14px; font: 600 12px var(--mono); cursor: pointer;
+    letter-spacing: .04em; text-transform: uppercase;
+  }
+  .tools button:hover { color: var(--text); border-color: #3A4055; }
+
+  /* ---------- legend + wiring ---------- */
+  .legend {
+    list-style: none; margin: 0; padding: 0; width: 390px;
+    display: flex; flex-direction: column; gap: 1px;
+    background: var(--wire); border: 1px solid var(--wire); border-radius: 12px;
+    overflow: hidden;
+  }
+  .legend li {
+    display: flex; gap: 12px; align-items: baseline;
+    background: var(--panel); padding: 11px 14px; font-size: 13px; color: var(--muted);
+  }
+  .legend code {
+    font-family: var(--mono); font-size: 11.5px; color: var(--text);
+    flex: 0 0 168px; letter-spacing: -.01em;
+  }
+
+  .wiring {
+    max-width: 880px; margin: 52px auto 0; padding: 0 28px;
+    display: grid; gap: 14px;
+  }
+  .wiring h2 {
+    margin: 0; font-family: var(--display); font-size: 19px; font-weight: 700;
+    letter-spacing: -.01em; text-wrap: balance;
+  }
+  .wiring p { margin: 0; color: var(--muted); font-size: 14.5px; max-width: 68ch; }
+  .wiring code {
+    font-family: var(--mono); font-size: .88em; color: var(--text);
+    background: var(--panel-2); padding: 1px 5px; border-radius: 4px;
+  }
+  .flow {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+    border: 1px solid var(--wire); border-radius: 12px; padding: 14px 16px;
+    background: var(--panel);
+  }
+  .flow b { color: var(--text); font-weight: 600; }
+  .flow .arrow { color: #4A5069; }
+
+  @media (max-width: 900px) { .stage { gap: 52px; } }
+  @media (max-width: 460px) {
+    .phone { width: 340px; height: 720px; }
+    .legend { width: 340px; }
+    .legend code { flex-basis: 150px; }
+    .clock { font-size: 74px; }
+  }
+</style>
+
+<header class="bar">
+  <div class="brand">Today <span>Widget Lab</span></div>
+  <p class="tagline">
+    Kilit ekranı widget'ının üç accessory ailesi ve app, tek paylaşılan store'a bağlı.
+    Rectangular slot'taki daireye dokun — gerçek cihazda bunu yapan şey <code>ToggleTaskIntent</code>.
+  </p>
+</header>
+
+<main class="stage">
+  <section class="unit">
+    <h2 class="cap">Lock Screen</h2>
+
+    <div class="phone lock">
+      <div class="notch"></div>
+      <div class="statusbar"><span>Today</span><span>100%</span></div>
+      <div class="lockface">
+        <div class="datel" id="lockDate"></div>
+        <div class="inline" id="inline"></div>
+        <div class="clock" id="clock"></div>
+        <div class="row">
+          <div class="w circ" id="circSlot">
+            <div class="gauge">
+              <svg width="58" height="58" viewBox="0 0 58 58" aria-hidden="true">
+                <circle class="track" cx="29" cy="29" r="24" fill="none" stroke-width="6"></circle>
+                <circle class="fill" id="gaugeFill" cx="29" cy="29" r="24" fill="none"
+                        stroke-width="6" stroke-dasharray="150.8" stroke-dashoffset="150.8"></circle>
+              </svg>
+              <div class="num" id="gaugeNum">0</div>
+            </div>
+          </div>
+          <div class="w rect">
+            <div class="rect-head" id="rectHead"></div>
+            <button class="rect-body" id="rectBody"></button>
+          </div>
+        </div>
+      </div>
+      <p class="hint">tap the circle → task completes, no unlock</p>
+    </div>
+
+    <ul class="legend">
+      <li><code>accessoryInline</code> saatin üstündeki tek satır</li>
+      <li><code>accessoryCircular</code> tamamlanan / toplam gauge'ı</li>
+      <li><code>accessoryRectangular</code> dokunulabilir tek görev</li>
+    </ul>
+  </section>
+
+  <section class="unit">
+    <h2 class="cap">App</h2>
+
+    <div class="phone app" id="appPhone">
+      <div class="notch"></div>
+      <div class="statusbar"><span>Today</span><span>100%</span></div>
+      <div class="navbar">
+        <div class="count" id="appCount">0/0</div>
+        <h1 id="appDate"></h1>
+      </div>
+      <div class="composer">
+        <input id="draft" placeholder="What needs doing?" autocomplete="off" aria-label="New task">
+        <button id="add" disabled aria-label="Add task">↑</button>
+      </div>
+      <div class="list" id="list"></div>
+    </div>
+
+    <div class="tools">
+      <button id="seed">Örnek veri</button>
+      <button id="reset">Sıfırla</button>
+    </div>
+  </section>
+</main>
+
+<footer class="wiring">
+  <h2>İki process, tek dosya</h2>
+  <p>
+    Widget kendi process'inde çalışır, app'in belleğini göremez. Paylaşımın tek yolu App Group
+    konteynerindeki <code>tasks.json</code>. Her değişiklik aynı huniden geçer: diski oku, değiştir,
+    atomik yaz, timeline'ı yenile — bu yüzden kilit ekranından tamamladığın görev app'i açtığında
+    geri dönmez. Bu demoda <code>localStorage</code> o dosyanın yerini tutuyor.
+  </p>
+  <div class="flow">
+    <b>tap</b><span class="arrow">→</span>
+    <b>ToggleTaskIntent</b><span class="arrow">→</span>
+    <span>read tasks.json</span><span class="arrow">→</span>
+    <span>mutate</span><span class="arrow">→</span>
+    <span>atomic write</span><span class="arrow">→</span>
+    <b>reloadAllTimelines()</b>
+  </div>
+</footer>
+
+<script>
+// ---------- model, ported 1:1 from Shared/ ----------
+const KEY = "today.demo.tasks";
+
+const dayKey = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// crypto.randomUUID needs a secure context, which file:// is not everywhere.
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+    }));
+
+// Storage can be unavailable (private window, blocked site data): never let a
+// failed read or write stop the page from rendering.
+let memory = [];
+const read = () => {
+  try { return JSON.parse(localStorage.getItem(KEY)) || memory; }
+  catch { return memory; }
+};
+const write = (t) => {
+  memory = t;
+  try { localStorage.setItem(KEY, JSON.stringify(t)); } catch { /* memory only */ }
+};
+
+// TaskStore.mutate — read, change, write, re-render both "processes"
+function mutate(change) {
+  const tasks = read();
+  change(tasks);
+  write(tasks);
+  render();
+}
+
+const add = (title) => {
+  const trimmed = title.trim();
+  if (!trimmed) return;
+  mutate(t => t.push({
+    id: uuid(), title: trimmed, isDone: false,
+    createdAt: new Date().toISOString(), completedAt: null, dayKey: dayKey()
+  }));
+};
+
+const toggle = (id) => mutate(t => {
+  const x = t.find(v => v.id === id);
+  if (!x) return;
+  x.isDone = !x.isDone;
+  x.completedAt = x.isDone ? new Date().toISOString() : null;
+});
+
+const remove = (id) => mutate(t => {
+  const i = t.findIndex(v => v.id === id);
+  if (i >= 0) t.splice(i, 1);
+});
+
+const todays = () => read()
+  .filter(t => t.dayKey === dayKey())
+  .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+// headlineTask — hybrid: oldest unfinished, else most recently completed
+function headlineTask(list) {
+  const next = list.find(t => !t.isDone);
+  if (next) return next;
+  const stamp = t => t.completedAt || t.createdAt;
+  // >= not >: same-millisecond completions compare equal, and we want the last
+  // of those, not the first.
+  return list.filter(t => t.isDone)
+    .reduce((best, t) => (!best || stamp(t) >= stamp(best)) ? t : best, null);
+}
+
+function snapshot() {
+  const list = todays();
+  const doneCount = list.filter(t => t.isDone).length;
+  return {
+    total: list.length, doneCount,
+    remaining: Math.max(0, list.length - doneCount),
+    isEmpty: list.length === 0,
+    allDone: list.length > 0 && doneCount === list.length,
+    progress: list.length ? doneCount / list.length : 0,
+    headline: headlineTask(list)
+  };
+}
+
+// ---------- rendering ----------
+const CIRC = 2 * Math.PI * 24;
+const ico = { circle: "○", filled: "◉", list: "☰", tray: "▢", seal: "✓", plus: "+" };
+const esc = (s) => s.replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+/// The demo stand-in for `today://add`: the widget cannot focus a field in
+/// another process, so it hands the intent over and the app decides.
+function routeToComposer() {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById("appPhone")
+    .scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center", inline: "nearest" });
+  draft.focus({ preventScroll: true });
+  const box = document.querySelector(".composer");
+  box.classList.remove("pulse");
+  void box.offsetWidth;          // restart the animation rather than ignore it
+  box.classList.add("pulse");
+  setTimeout(() => box.classList.remove("pulse"), 1900);
+}
+
+function renderWidget(s) {
+  document.getElementById("gaugeFill").style.strokeDashoffset = CIRC * (1 - s.progress);
+  document.getElementById("gaugeNum").textContent = s.isEmpty ? ico.plus : s.doneCount;
+
+  document.getElementById("rectHead").textContent =
+    s.isEmpty   ? `${ico.tray} Today`
+  : s.allDone   ? `${ico.seal} All done · ${s.total}`
+  :               `${ico.list} ${s.doneCount}/${s.total} done`;
+
+  const body = document.getElementById("rectBody");
+  body.className = "rect-body" + (s.headline && s.headline.isDone ? " done" : "");
+  if (!s.headline) {
+    body.innerHTML = `<span class="title">${s.isEmpty ? "Add something to do" : "Nothing left today"}</span>`;
+    // Nothing to toggle — so the slot routes into the app instead.
+    body.disabled = false;
+    body.onclick = routeToComposer;
+  } else {
+    body.disabled = false;
+    body.innerHTML =
+      `<span class="dot">${s.headline.isDone ? ico.filled : ico.circle}</span>` +
+      `<span class="title">${esc(s.headline.title)}</span>`;
+    body.onclick = () => toggle(s.headline.id);
+  }
+
+  // Mirrors `.widgetURL(isEmpty ? add : today)`: on an empty day the whole
+  // widget is one big "add a task" target, not just the rectangular slot.
+  const circ = document.getElementById("circSlot");
+  const inlineEl = document.getElementById("inline");
+  for (const el of [circ, inlineEl]) {
+    el.classList.toggle("linkish", s.isEmpty);
+    el.onclick = s.isEmpty ? routeToComposer : null;
+  }
+
+  inlineEl.textContent =
+    s.isEmpty   ? `${ico.tray} No tasks today`
+  : s.allDone   ? `${ico.seal} All ${s.total} done`
+  :               `${ico.list} ${s.remaining} left · ${s.headline ? s.headline.title : ""}`;
+}
+
+function renderApp(s) {
+  const list = todays();
+  const open = list.filter(t => !t.isDone);
+  const done = list.filter(t => t.isDone);
+  document.getElementById("appCount").textContent = `${s.doneCount}/${s.total}`;
+
+  const row = (t) => `<button class="item ${t.isDone ? "done" : ""}" data-id="${t.id}">
+      <span class="box">${t.isDone ? ico.filled : ico.circle}</span>
+      <span class="txt">${esc(t.title)}</span>
+      <span class="del" data-del="${t.id}" role="button" aria-label="Delete">×</span>
+    </button>`;
+
+  let html = "";
+  if (open.length) html += `<div class="sect">To do · ${open.length}</div>` + open.map(row).join("");
+  if (done.length) html += `<div class="sect">Done · ${done.length}</div>` + done.map(row).join("");
+  if (!list.length) html += `<div class="empty">Nothing for today yet. Add the first thing above — it shows up on the Lock Screen right away.</div>`;
+
+  const el = document.getElementById("list");
+  el.innerHTML = html;
+  el.querySelectorAll(".item").forEach(n =>
+    n.onclick = (e) => { e.target.dataset.del ? remove(e.target.dataset.del) : toggle(n.dataset.id); });
+}
+
+function render() {
+  const s = snapshot();
+  renderWidget(s);
+  renderApp(s);
+}
+
+// ---------- clock ----------
+function tick() {
+  const now = new Date();
+  document.getElementById("clock").textContent =
+    `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const long = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  document.getElementById("lockDate").textContent = long;
+  document.getElementById("appDate").textContent = long;
+}
+
+const draft = document.getElementById("draft");
+const addBtn = document.getElementById("add");
+draft.oninput = () => addBtn.disabled = !draft.value.trim();
+const commit = () => { add(draft.value); draft.value = ""; addBtn.disabled = true; draft.focus(); };
+addBtn.onclick = commit;
+draft.onkeydown = (e) => { if (e.key === "Enter") commit(); };
+
+const seed = () => {
+  write([]);
+  ["Call the bank", "Ship widget demo", "Groceries", "Reply to Ayşe", "Gym"].forEach(add);
+  const list = todays();
+  toggle(list[0].id);
+  toggle(list[2].id);
+};
+document.getElementById("seed").onclick = seed;
+document.getElementById("reset").onclick = () => { write([]); render(); };
+
+tick();
+setInterval(tick, 10000);
+if (read().length) render(); else seed();
+</script>

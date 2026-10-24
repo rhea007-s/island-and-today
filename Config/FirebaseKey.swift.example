@@ -1,0 +1,5 @@
+// Copy to Shared/FirebaseKey.swift and paste your Firebase Web API key.
+// That file is git-ignored so the key stays out of the repository.
+enum FirebaseKey {
+    static let web = "YOUR_FIREBASE_WEB_API_KEY"
+}

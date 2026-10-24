@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- The island: black pill, purple dot, green equalizer — inside the 66dp safe zone. -->
+    <path android:fillColor="#000000" android:strokeColor="#40FFFFFF" android:strokeWidth="0.8"
+        android:pathData="M33,45h42a9,9 0 0 1 0,18h-42a9,9 0 0 1 0,-18z"/>
+    <path android:fillColor="#7C6CFF" android:pathData="M37,54a4,4 0 1,0 8,0a4,4 0 1,0 -8,0z"/>
+    <path android:fillColor="#34C759"
+        android:pathData="M62,50.5h2v7h-2zM66,48h2v12h-2zM70,51.5h2v5h-2z"/>
+</vector>
