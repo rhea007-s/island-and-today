@@ -1,3 +1,59 @@
+# Island & Today
+
+Two small apps that share one task list.
+
+- **Island** puts a Dynamic Island in the Mac notch (and as a pill on displays
+  without one, and on Android): today's tasks, a focus timer, now playing,
+  clipboard history and live system load, one click away.
+- **Today** is an iPhone to-do list whose Lock Screen widget completes tasks
+  without unlocking the phone, with Calendar sync and Live Activities.
+
+With an optional account, the same list syncs between iPhone, Mac and Android.
+
+**Product pages:** [Island](https://sueda-nil-karaman.vercel.app/island/) ·
+[Today](https://sueda-nil-karaman.vercel.app/today/) ·
+by [Sueda Nil Karaman](https://sueda-nil-karaman.vercel.app)
+
+## Download
+
+| | |
+|---|---|
+| **Island for Mac** (macOS 14+, Apple silicon and Intel) | [Island-Mac.dmg](https://github.com/rhea007-s/island-and-today/releases/latest/download/Island-Mac.dmg) |
+| **Island for Android** (Android 10+) | [Island-Android.apk](https://github.com/rhea007-s/island-and-today/releases/latest/download/Island-Android.apk) |
+| **Today for iPhone** (iOS 17+) | Build from source (below). Shipping on the App Store needs Apple's paid developer programme. |
+
+The Mac app isn't notarised, so the first time macOS blocks it:
+**System Settings → Privacy & Security → Open Anyway**.
+
+## Build from source
+
+The Firebase Web API key used for sync is kept out of this repository.
+Before building, create your own copy of the two git-ignored files:
+
+```sh
+cp Config/FirebaseKey.swift.example Shared/FirebaseKey.swift   # Mac and iPhone
+echo "ISLAND_FIREBASE_KEY=your-key" >> Android/local.properties  # Android
+```
+
+Sync is optional; with the placeholder value everything else works.
+Then:
+
+```sh
+brew install xcodegen
+./island.sh     # Mac: build, install to /Applications, open
+./iphone.sh     # iPhone: build and install on a connected device
+./android.sh    # Android: build and install on a connected device
+./share.sh      # release builds: universal .dmg + signed .apk
+```
+
+`firestore.rules` holds the database rules: every signed-in user can read and
+write only `users/{their uid}/…`, and nobody can list users.
+
+I designed both apps and directed the build; much of the code was written with
+an AI agent and reviewed by me.
+
+---
+
 # Today — Lock Screen task widget for iPhone
 
 A small SwiftUI app plus a WidgetKit extension. The Lock Screen widget shows
@@ -118,7 +174,6 @@ names live in `AppGroup.Route` so neither target can drift from the other.
 - `WidgetConfigurationIntent` so each widget slot can pin a specific list.
 - A streak count (`completedAt` is already stored for this).
 - Live Activity for a task you are actively working on.
-- iCloud sync via `NSUbiquitousKeyValueStore` or CloudKit.
 
 ## Island — the Mac side (macOS 14+)
 
@@ -144,8 +199,9 @@ peek of the next task. Click → full panel. Esc / click outside → closes.
 
 Files: `Island/` (Mac only) + `Shared/` (both; `FocusActivity.swift` is
 iPhone-only — ActivityKit does not exist on macOS). The Mac keeps its own
-list in `~/Library/Application Support/Island/tasks.json`; iPhone and Mac
-do **not** sync yet (needs iCloud, i.e. a paid developer account).
+list in `~/Library/Application Support/Island/tasks.json`. With an account in
+Settings → Sync, iPhone, Mac and Android share one list through Firestore's
+REST API (`Shared/CloudSync.swift`, `Android/.../CloudSync.kt`); no Firebase SDK.
 
 
 ## iPhone ↔ Mac sync (Firestore) and the iPhone calendar
