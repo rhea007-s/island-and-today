@@ -150,11 +150,25 @@ final class IslandController {
     private func resize() {
         let target = panelFrame()
         shrinkTask?.cancel()
-        if target.width >= panel.frame.width && target.height >= panel.frame.height {
+        let current = panel.frame
+        if target.width >= current.width && target.height >= current.height {
             panel.setFrame(target, display: true)
+        } else if target.width > current.width || target.height > current.height {
+            let union = CGRect(
+                x: min(target.minX, current.minX),
+                y: min(target.minY, current.minY),
+                width: max(target.width, current.width),
+                height: max(target.height, current.height)
+            )
+            panel.setFrame(union, display: true)
+            shrinkTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(400))
+                guard let self, !Task.isCancelled else { return }
+                self.panel.setFrame(self.panelFrame(), display: true)
+            }
         } else {
             shrinkTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(450))
+                try? await Task.sleep(for: .milliseconds(400))
                 guard let self, !Task.isCancelled else { return }
                 self.panel.setFrame(self.panelFrame(), display: true)
             }

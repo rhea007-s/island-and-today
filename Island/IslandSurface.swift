@@ -15,6 +15,8 @@ struct IslandSurface<S: Shape>: View {
     /// The Settings previews sit on a painted backdrop inside a window, so
     /// the pre-Tahoe blur there must sample the window, not the desktop.
     var withinWindow: Bool = false
+    /// Ambient backlight glow (e.g. from playing music or accent)
+    var ambientGlow: Color? = nil
 
     var body: some View {
         switch style {
@@ -24,29 +26,44 @@ struct IslandSurface<S: Shape>: View {
         }
     }
 
+    @ViewBuilder
+    private var glowLayer: some View {
+        if let ambientGlow {
+            shape
+                .fill(ambientGlow)
+                .blur(radius: resting ? 16 : 28)
+                .opacity(resting ? 0.35 : 0.48)
+                .offset(y: resting ? 2 : 6)
+        }
+    }
+
     // MARK: Apple
 
     /// Pure black with a hairline catching light along the edge, brightest
     /// at the top — the way the iPhone island picks up a glint.
     private var apple: some View {
-        shape
-            .fill(Color.black)
-            .overlay {
-                shape
-                    .stroke(
-                        LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.03)], startPoint: .top, endPoint: .bottom),
-                        lineWidth: 1.5
-                    )
-                    .clipShape(shape)
-                    .opacity(resting ? 0 : 1)
-            }
-            .shadow(color: .black.opacity(resting ? 0 : 0.5), radius: 20, y: 10)
+        ZStack {
+            glowLayer
+            shape
+                .fill(Color.black)
+                .overlay {
+                    shape
+                        .stroke(
+                            LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.03)], startPoint: .top, endPoint: .bottom),
+                            lineWidth: 1.5
+                        )
+                        .clipShape(shape)
+                        .opacity(resting ? 0 : 1)
+                }
+                .shadow(color: .black.opacity(resting ? 0 : 0.5), radius: 20, y: 10)
+        }
     }
 
     // MARK: Glass
 
     private var glass: some View {
         ZStack {
+            glowLayer
             GlassBase(shape: shape, withinWindow: withinWindow)
             // Specular rim: light comes from the top left.
             shape
@@ -73,6 +90,7 @@ struct IslandSurface<S: Shape>: View {
             startPoint: .top, endPoint: .bottom
         )
         return ZStack {
+            glowLayer
             shape.fill(accent).offset(y: resting ? 2 : 6)
             shape.fill(ink)
             shape.stroke(Color.white, lineWidth: resting ? 3 : 5).clipShape(shape)
