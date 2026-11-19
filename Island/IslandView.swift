@@ -14,14 +14,48 @@ struct NotchShape: Shape {
 
     func path(in r: CGRect) -> Path {
         var p = Path()
+        let t = max(0, top)
+        let b = max(0, bottom)
+
         p.move(to: CGPoint(x: r.minX, y: r.minY))
-        p.addQuadCurve(to: CGPoint(x: r.minX + top, y: r.minY + top), control: CGPoint(x: r.minX + top, y: r.minY))
-        p.addLine(to: CGPoint(x: r.minX + top, y: r.maxY - bottom))
-        p.addQuadCurve(to: CGPoint(x: r.minX + top + bottom, y: r.maxY), control: CGPoint(x: r.minX + top, y: r.maxY))
-        p.addLine(to: CGPoint(x: r.maxX - top - bottom, y: r.maxY))
-        p.addQuadCurve(to: CGPoint(x: r.maxX - top, y: r.maxY - bottom), control: CGPoint(x: r.maxX - top, y: r.maxY))
-        p.addLine(to: CGPoint(x: r.maxX - top, y: r.minY + top))
-        p.addQuadCurve(to: CGPoint(x: r.maxX, y: r.minY), control: CGPoint(x: r.maxX - top, y: r.minY))
+        // Top-left flare (continuous G2 cubic transition from horizontal menu bar to vertical side)
+        if t > 0 {
+            p.addCurve(
+                to: CGPoint(x: r.minX + t, y: r.minY + t),
+                control1: CGPoint(x: r.minX + t * 0.45, y: r.minY),
+                control2: CGPoint(x: r.minX + t, y: r.minY + t * 0.55)
+            )
+        }
+        // Down the left edge
+        p.addLine(to: CGPoint(x: r.minX + t, y: r.maxY - b))
+        // Bottom-left corner (continuous squircle curve)
+        if b > 0 {
+            p.addCurve(
+                to: CGPoint(x: r.minX + t + b, y: r.maxY),
+                control1: CGPoint(x: r.minX + t, y: r.maxY - b * 0.448),
+                control2: CGPoint(x: r.minX + t + b * 0.552, y: r.maxY)
+            )
+        }
+        // Bottom edge
+        p.addLine(to: CGPoint(x: r.maxX - t - b, y: r.maxY))
+        // Bottom-right corner (continuous squircle curve)
+        if b > 0 {
+            p.addCurve(
+                to: CGPoint(x: r.maxX - t, y: r.maxY - b),
+                control1: CGPoint(x: r.maxX - t - b * 0.448, y: r.maxY),
+                control2: CGPoint(x: r.maxX - t, y: r.maxY - b * 0.448)
+            )
+        }
+        // Up the right edge
+        p.addLine(to: CGPoint(x: r.maxX - t, y: r.minY + t))
+        // Top-right flare (continuous G2 cubic transition to horizontal menu bar)
+        if t > 0 {
+            p.addCurve(
+                to: CGPoint(x: r.maxX, y: r.minY),
+                control1: CGPoint(x: r.maxX - t, y: r.minY + t * 0.55),
+                control2: CGPoint(x: r.maxX - t * 0.45, y: r.minY)
+            )
+        }
         p.closeSubpath()
         return p
     }
@@ -62,7 +96,8 @@ struct IslandView: View {
                     shape: shape,
                     accent: model.settings.accent.color,
                     resting: model.state == .compact,
-                    blendsWithNotch: model.geometry.hasNotch
+                    blendsWithNotch: model.geometry.hasNotch,
+                    ambientGlow: model.music.isPlaying ? (model.music.dominantColor ?? model.settings.accent.color) : nil
                 )
 
                 content
@@ -162,7 +197,7 @@ struct CompactIsland: View {
         case .meeting(let event):
             MeetingWing(event: event, leading: false)
         case .music:
-            EqualizerBars(playing: model.music.isPlaying, color: model.settings.accent.color)
+            EqualizerBars(playing: model.music.isPlaying, color: model.music.dominantColor ?? model.settings.accent.color)
                 .frame(width: 18, height: 12)
         case .none:
             EmptyView()

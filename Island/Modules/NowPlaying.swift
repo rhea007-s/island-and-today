@@ -37,6 +37,9 @@ final class NowPlaying {
     private(set) var track: Track?
     /// The user said no to Automation for a player; the tab says how to undo it.
     private(set) var deniedPlayer: Player?
+    /// Dominant color extracted from the album artwork, or a harmonic fallback.
+    private(set) var dominantColor: Color?
+    private var colorCache: [String: Color] = [:]
 
     var isPlaying: Bool { track?.isPlaying == true }
 
@@ -63,7 +66,10 @@ final class NowPlaying {
         runningPlayers = Player.allCases.filter {
             !NSRunningApplication.runningApplications(withBundleIdentifier: $0.bundleID).isEmpty
         }
-        if runningPlayers.isEmpty { track = nil }
+        if runningPlayers.isEmpty {
+            track = nil
+            dominantColor = nil
+        }
         reschedule()
     }
 
@@ -91,13 +97,19 @@ final class NowPlaying {
             guard let self else { return }
             switch result {
             case .track(let t):
+                let trackChanged = self.track?.title != t.title || self.track?.artist != t.artist || self.track?.artworkURL != t.artworkURL
                 if self.track != t { self.track = t }
+                if trackChanged || self.dominantColor == nil { self.updateDominantColor(for: t) }
                 self.deniedPlayer = nil
             case .nothing:
-                if self.track != nil { self.track = nil }
+                if self.track != nil {
+                    self.track = nil
+                    self.dominantColor = nil
+                }
             case .denied(let p):
                 self.deniedPlayer = p
                 self.track = nil
+                self.dominantColor = nil
             }
             self.reschedule()
         }
@@ -113,6 +125,116 @@ final class NowPlaying {
     func playPause() { send("playpause") }
     func next() { send("next track") }
     func previous() { send("previous track") }
+
+    private func updateDominantColor(for track: Track?) {
+        guard let track else {
+            dominantColor = nil
+            return
+        }
+        let cacheKey = track.artworkURL?.absoluteString ?? "\(track.artist)-\(track.title)"
+        if let cached = colorCache[cacheKey] {
+            if dominantColor != cached { dominantColor = cached }
+            return
+        }
+
+        if let url = track.artworkURL {
+            Task.detached(priority: .utility) { [weak self, url, cacheKey] in
+                guard let data = try? Data(contentsOf: url),
+                      let image = NSImage(data: data) else {
+                    await MainActor.run { self?.applyFallbackColor(key: cacheKey, artist: track.artist, title: track.title) }
+                    return
+                }
+                let color = Self.extractColor(from: image)
+                await MainActor.run {
+                    self?.colorCache[cacheKey] = color
+                    if self?.track?.artworkURL == url {
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            self?.dominantColor = color
+                        }
+                    }
+                }
+            }
+        } else {
+            applyFallbackColor(key: cacheKey, artist: track.artist, title: track.title)
+        }
+    }
+
+    private func applyFallbackColor(key: String, artist: String, title: String) {
+        let hash = abs((artist + title).hashValue)
+        let hue = Double(hash % 360) / 360.0
+        let color = Color(hue: hue, saturation: 0.7, brightness: 0.9)
+        colorCache[key] = color
+        withAnimation(.easeInOut(duration: 0.35)) {
+            dominantColor = color
+        }
+    }
+
+    nonisolated private static func extractColor(from image: NSImage) -> Color {
+        let targetSize = NSSize(width: 16, height: 16)
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: 16,
+            pixelsHigh: 16,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 16 * 4,
+            bitsPerPixel: 32
+        ) else {
+            return Color(red: 0.30, green: 0.62, blue: 1.00)
+        }
+
+        NSGraphicsContext.saveGraphicsState()
+        let context = NSGraphicsContext(bitmapImageRep: rep)
+        NSGraphicsContext.current = context
+        image.draw(in: NSRect(origin: .zero, size: targetSize))
+        NSGraphicsContext.restoreGraphicsState()
+
+        var bestColor: NSColor?
+        var maxScore: CGFloat = -1
+
+        for y in 0..<16 {
+            for x in 0..<16 {
+                guard let pixel = rep.colorAt(x: x, y: y) else { continue }
+                let s = pixel.saturationComponent
+                let b = pixel.brightnessComponent
+                if b > 0.15 && b < 0.95 && s > 0.25 {
+                    let score = s * 1.5 + b
+                    if score > maxScore {
+                        maxScore = score
+                        bestColor = pixel
+                    }
+                }
+            }
+        }
+
+        if let best = bestColor {
+            let finalColor = NSColor(
+                hue: best.hueComponent,
+                saturation: min(1.0, max(0.55, best.saturationComponent * 1.2)),
+                brightness: min(1.0, max(0.75, best.brightnessComponent * 1.1)),
+                alpha: 1.0
+            )
+            return Color(nsColor: finalColor)
+        }
+        return Color(red: 0.30, green: 0.62, blue: 1.00)
+    }
+
+    func seek(to seconds: Double) {
+        guard let player = track?.player ?? runningPlayers.first else { return }
+        if var current = track {
+            current.position = seconds
+            current.readAt = Date()
+            self.track = current
+        }
+        let posStr = String(format: "%.1f", seconds).replacingOccurrences(of: ",", with: ".")
+        worker.run("tell application \"\(player.rawValue)\" to set player position to \(posStr)") { [weak self] in
+            self?.poll()
+        }
+    }
+
 
     /// Brings the player forward on the song that is playing: Spotify opens
     /// the track's own page, Music scrolls its library to the track.
@@ -278,7 +400,7 @@ struct MusicTab: View {
             Artwork(url: track.artworkURL, size: 150)
                 .onTapGesture { model.music.openSong() }
                 .help("Open this song in \(track.player.rawValue)")
-                .shadow(color: .black.opacity(0.6), radius: 14, y: 6)
+                .shadow(color: (model.music.dominantColor ?? .black).opacity(model.music.dominantColor != nil ? 0.45 : 0.6), radius: 18, y: 8)
                 .scaleEffect(track.isPlaying ? 1 : 0.92)
                 .animation(.spring(response: 0.45, dampingFraction: 0.8), value: track.isPlaying)
 
@@ -296,22 +418,7 @@ struct MusicTab: View {
 
                 Spacer(minLength: 8)
 
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    let elapsed = track.isPlaying ? context.date.timeIntervalSince(track.readAt) : 0
-                    let position = min(track.duration, track.position + elapsed)
-                    VStack(spacing: 4) {
-                        ProgressView(value: track.duration > 0 ? position / track.duration : 0)
-                            .progressViewStyle(.linear)
-                        HStack {
-                            Text(clock(position))
-                            Spacer()
-                            Text("-" + clock(max(0, track.duration - position)))
-                        }
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.white.opacity(0.45))
-                    }
-                }
+                MusicScrubber(track: track, music: music, accent: model.music.dominantColor ?? model.settings.accent.color)
 
                 HStack(spacing: 18) {
                     control("backward.fill", 16) { music.previous() }
@@ -352,5 +459,82 @@ struct MusicTab: View {
             extra()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct MusicScrubber: View {
+    let track: NowPlaying.Track
+    let music: NowPlaying
+    let accent: Color
+
+    @State private var isDragging = false
+    @State private var dragPosition: Double = 0
+    @State private var isHovering = false
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.25)) { context in
+            let elapsed = (track.isPlaying && !isDragging) ? context.date.timeIntervalSince(track.readAt) : 0
+            let current = isDragging ? dragPosition : min(track.duration, track.position + elapsed)
+            let progress = track.duration > 0 ? max(0, min(1, current / track.duration)) : 0
+
+            VStack(spacing: 5) {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(.white.opacity(isHovering || isDragging ? 0.22 : 0.12))
+                            .frame(height: isHovering || isDragging ? 5 : 3.5)
+
+                        Capsule()
+                            .fill(accent)
+                            .frame(width: max(0, geo.size.width * CGFloat(progress)), height: isHovering || isDragging ? 5 : 3.5)
+
+                        if isHovering || isDragging {
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 10, height: 10)
+                                .shadow(color: .black.opacity(0.4), radius: 3, y: 1)
+                                .offset(x: max(0, min(geo.size.width - 10, geo.size.width * CGFloat(progress) - 5)))
+                                .transition(.scale.combined(with: .opacity))
+                        }
+                    }
+                    .frame(height: 12)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                isDragging = true
+                                let clampedX = max(0, min(geo.size.width, value.location.x))
+                                let newProgress = Double(clampedX / geo.size.width)
+                                dragPosition = newProgress * track.duration
+                            }
+                            .onEnded { value in
+                                let clampedX = max(0, min(geo.size.width, value.location.x))
+                                let newProgress = Double(clampedX / geo.size.width)
+                                let target = newProgress * track.duration
+                                music.seek(to: target)
+                                Haptics.tap()
+                                isDragging = false
+                            }
+                    )
+                }
+                .frame(height: 12)
+                .onHover { h in
+                    withAnimation(.easeInOut(duration: 0.15)) { isHovering = h }
+                }
+
+                HStack {
+                    Text(clock(current))
+                    Spacer()
+                    Text("-" + clock(max(0, track.duration - current)))
+                }
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(isDragging ? 0.85 : 0.5))
+            }
+        }
+    }
+
+    private func clock(_ seconds: Double) -> String {
+        Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond))
     }
 }
